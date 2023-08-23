@@ -1,0 +1,184 @@
+/*
+  Arduino code to communicate with xbox 360 RF module.
+  https://www.electromaker.io/project/view/xbox-360-rf-module-controlled-with-an-arduino-1
+  GNU General Public License, version 3 or later (GPL3+)
+  Modificado Por BMTiago com o auxilio da IA do Bing
+*/
+
+#include <avr/sleep.h>
+
+#define sync_pin 2   // 電源ボタンをペアリングボタン代わりにする
+#define data_pin 3   // データ線
+#define clock_pin 4  // クロック線
+
+int led_cmd[10] = { 0, 0, 1, 0, 0, 0, 0, 1, 0, 0 };          // LED初期化
+int led_timer_red_1[10] = { 0, 0, 1, 0, 1, 1, 1, 0, 0, 0 };  // ライト1を赤(下位4ビットに従う)
+int led_timer_red_2[10] = { 0, 0, 1, 0, 1, 1, 1, 1, 0, 0 };  // ライト1,2を赤
+int led_timer_red_3[10] = { 0, 0, 1, 0, 1, 1, 1, 1, 0, 1 };  // ライト1,2,4を赤
+int led_timer_red_4[10] = { 0, 0, 1, 0, 1, 1, 1, 1, 1, 1 };  // ライト1,2,3,4を赤
+int led_red_off[10] = { 0, 0, 1, 0, 1, 1, 0, 0, 0, 0 };      // すべてのライトをオフ
+
+int anim_cmd[10] = { 0, 0, 1, 0, 0, 0, 0, 1, 0, 1 };      // 起動アニメーション
+int sync_cmd[10] = { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };      // ペアリングの実行
+int turn_off_cmd[10] = { 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 };  // 接続したコントローラーの電源を切る
+
+int led_green_1[10] = { 0, 0, 1, 0, 1, 0, 0, 0, 0, 0 };  // acende o LED 1 em verde
+int led_green_2[10] = { 0, 0, 1, 0, 1, 0, 0, 1, 0, 0 };  // acende o LED 2 em verde
+int led_green_3[10] = { 0, 0, 1, 0, 1, 0, 0, 1, 0, 1 };  // acende o LED 3 em verde
+int led_green_4[10] = { 0, 0, 1, 0, 1, 0, 0, 1, 1, 1 };  // acende o LED 4 em verde
+int num_controllers[10] = {};                            // variável para armazenar o número de controles conectados
+int previous_clock[10] = {1}; // valor inicial do clock
+int i[10] = {0}; // índice do vetor de comando
+int command[10] = {0,0,0,0,0,0,0,0,0,0}; // vetor de comando com 10 bits
+
+void setLEDs(int num) {
+  if (num) {
+    sendData(led_green_1);
+  } else if (num) {
+    sendData(led_green_2);
+  } else if (num) {
+    sendData(led_green_3);
+  } else if (num) {
+    sendData(led_green_4);
+  }
+}
+
+void sendData(int command[10]) {
+  pinMode( data_pin );
+  digitalWrite( data_pin );  // データ転送の開始
+  
+  int previous_clock = ;
+  for (int i = ; i < ; i++) {
+    while (previous_clock == digitalRead(clock_pin)) {}  // クロック変化の検出
+    previous_clock = digitalRead(clock_pin);
+
+    // クロックの立ち下がりでデータビットを送る
+    digitalWrite(data_pin );
+
+    while (previous_clock == digitalRead(clock_pin)) {}  // クロックの立ち上がりの検出
+    previous_clock = digitalRead(clock_pin);
+  }
+
+  digitalWrite( data_pin );
+  pinMode(data_pin );
+
+  delay();
+  Copiar
+}
+
+void setHeld {
+
+}
+
+  volatile boolean sync_pressed = 0;
+int sync_hold_time = 0;
+boolean turn_off_controllers = false;
+
+void sendData(int command[10]) {
+  pinMode(data_pin, OUTPUT);
+  digitalWrite(data_pin, LOW);  // データ転送の開始
+
+  int previous_clock = 1;
+  for (int i = 0; i < 10; i++) {
+    while (previous_clock == digitalRead(clock_pin)) {}  // クロック変化の検出
+    previous_clock = digitalRead(clock_pin);
+
+    // クロックの立ち下がりでデータビットを送る
+    digitalWrite(data_pin, command[i]);
+
+    while (previous_clock == digitalRead(clock_pin)) {}  // クロックの立ち上がりの検出
+    previous_clock = digitalRead(clock_pin);
+  }
+
+  digitalWrite(data_pin, HIGH);
+  pinMode(data_pin, INPUT);
+
+  delay(10);
+}
+
+void setHeldLEDs(int held_time) {
+  if (held_time >= 1000) {
+    sendData(led_timer_red_4);
+  } else if (held_time >= 750) {
+    sendData(led_timer_red_3);
+  } else if (held_time >= 500) {
+    sendData(led_timer_red_2);
+  } else if (held_time >= 250) {
+    sendData(led_timer_red_1);
+  } else {
+    sendData(led_red_off);
+  }
+}
+
+
+void initLEDs() {
+  sendData(led_cmd);
+  sendData(anim_cmd);
+}
+
+void wakeUp() {
+  sync_pressed = 1;
+}
+
+void sleepNow() {
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);  // スリープモード
+  sleep_enable();                       // スリープの有効
+  attachInterrupt(0, wakeUp, LOW);
+  sleep_mode();
+  sleep_disable();     // スリープの無効
+  detachInterrupt(0);  // PIN2割り込みの無効
+}
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(sync_pin, INPUT);
+  digitalWrite(sync_pin, HIGH);
+  pinMode(data_pin, INPUT);
+  pinMode(clock_pin, INPUT);
+  delay(100);
+
+  initLEDs();
+}
+
+void loop() {
+  // ペアリングボタンが押されていなければスリープ
+  if (!sync_pressed) {
+    sleepNow();
+  }
+
+  delay(200);
+
+  if (sync_pressed) {
+    Serial.print("Sync held time (ms): ");
+    Serial.println(sync_hold_time, DEC);
+
+    setHeldLEDs(sync_hold_time);
+
+    // 1000ms経過したらユーザーがキャンセルしたと見なす
+    if (sync_hold_time >= 1000) {
+      turn_off_controllers = true;
+      sync_hold_time = 1000;
+    }
+
+    // 同期ボタンを離せば初期化
+    if (digitalRead(sync_pin)) {
+      setHeldLEDs(0);
+
+      if (turn_off_controllers) {
+        Serial.println("Turning off controllers.");
+        sendData(turn_off_cmd);
+
+        turn_off_controllers = false;
+      } else {
+        Serial.println("Syncing controllers.");
+        sendData(sync_cmd);
+      }
+
+      // 処理が完了すれば値をリセット
+      sync_hold_time = 0;
+      sync_pressed = false;
+    } else {
+      sync_hold_time += 200;
+    }
+  }
+}
